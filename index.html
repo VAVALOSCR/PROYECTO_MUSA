@@ -2,164 +2,327 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Feliz Cumpleaños Anghely ❤️</title>
+<title>Control Carrito + Radar (Serial)</title>
 
 <style>
+
 body{
-    margin:0;
-    padding:0;
-    font-family: 'Segoe UI', sans-serif;
-    background: linear-gradient(to bottom, #ff9a9e, #fad0c4);
-    overflow:hidden;
+    font-family: Arial;
+    background:#ecf3f9;
     text-align:center;
 }
 
-/* CONTENEDOR PRINCIPAL */
-#card{
-    background:white;
-    width:85%;
-    max-width:500px;
-    margin:80px auto;
-    padding:30px;
-    border-radius:25px;
-    box-shadow:0 0 25px rgba(0,0,0,0.2);
-    animation: aparecer 2s ease;
+h2{
+    margin:5px;
 }
 
-@keyframes aparecer{
-    from{
-        opacity:0;
-        transform:scale(0.8);
-    }
-    to{
-        opacity:1;
-        transform:scale(1);
-    }
+/* PANEL */
+
+#panel{
+    display:flex;
+    justify-content:center;
+    gap:20px;
 }
 
-h1{
-    color:#ff4d6d;
-    font-size:30px;
-}
+/* BOTONES */
 
-p{
-    font-size:18px;
-    color:#444;
-    line-height:1.6;
-}
-
-/* BOTÓN */
 button{
-    background:#ff4d6d;
-    color:white;
-    border:none;
-    padding:15px 30px;
-    border-radius:25px;
-    font-size:18px;
+    font-size:20px;
+    width:60px;
+    height:60px;
     cursor:pointer;
-    margin-top:20px;
-    transition:0.3s;
 }
 
-button:hover{
-    background:#ff1c4a;
+/* RADAR */
+
+canvas{
+    background:black;
+    margin:10px;
+    border:2px solid #333;
 }
 
-/* CORAZONES */
-.heart{
-    position:absolute;
-    color:red;
-    font-size:25px;
-    animation: flotar 6s linear infinite;
+/* LOG */
+
+#log{
+    width:90%;
+    height:120px;
+    margin:auto;
+    background:black;
+    color:lime;
+    font-family: Consolas;
+    overflow:auto;
+    padding:5px;
 }
 
-@keyframes flotar{
-    from{
-        transform:translateY(100vh);
-        opacity:1;
-    }
-    to{
-        transform:translateY(-10vh);
-        opacity:0;
-    }
-}
 </style>
 </head>
 
 <body>
 
-<!-- AUDIO PERSONALIZADO -->
-<audio id="music" loop>
-    <source src="fc.mp3" type="audio/mp3">
-    Tu navegador no soporta audio.
-</audio>
+<h2>CONTROL REMOTO CON RADAR (SERIAL)</h2>
 
-<!-- TARJETA -->
-<div id="card">
+<button onclick="conectar()">🔌 Conectar</button>
 
-    <h1>🎂 Feliz Cumpleaños Anghely ❤️</h1>
+<br><br>
 
-    <p>
-        Mi amor hermoso… 💖 <br><br>
+<div id="panel">
 
-        Hoy celebro tu vida, tu sonrisa,
-        tu ternura y todo lo bonito
-        que despiertas en mi corazón. ✨<br><br>
+<!-- COMANDOS -->
+<div>
+<h3>Comandos</h3>
 
-        Gracias por ser mi paz,
-        mi alegría, mi refugio
-        y mi lugar favorito. 💕<br><br>
-
-        No importa cuántos años pasen,
-        siempre elegiré amarte,
-        cuidarte y caminar contigo. 🌹<br><br>
-
-        Eres mi historia favorita,
-        mi capítulo más bonito
-        y mi sueño hecho realidad. 💘
-    </p>
-
-    <p><strong>Con todo mi amor,<br> Víctor ❤️</strong></p>
-
-    <button onclick="iniciar()">💝 Presiona aquí 💝</button>
+Adelante <input id="cmdF" value="F" size="2"><br>
+Atrás <input id="cmdB" value="B" size="2"><br>
+Izquierda <input id="cmdL" value="L" size="2"><br>
+Derecha <input id="cmdR" value="R" size="2"><br>
+Stop <input id="cmdS" value="S" size="2"><br>
 
 </div>
 
+<!-- CONTROL -->
+<div>
+<h3>Control</h3>
+
+<button onclick="enviar(cmdF.value)">⬆</button><br>
+
+<button onclick="enviar(cmdL.value)">⬅</button>
+<button onclick="enviar(cmdS.value)">🛑</button>
+<button onclick="enviar(cmdR.value)">➡</button><br>
+
+<button onclick="enviar(cmdB.value)">⬇</button>
+
+</div>
+
+</div>
+
+<br>
+
+<!-- RADAR -->
+<canvas id="radar" width="350" height="350"></canvas>
+
+<!-- LOG -->
+<div id="log"></div>
+
+
 <script>
 
-// INICIAR SORPRESA
-function iniciar(){
+let port;
+let reader;
+let writer;
 
-    const musica = document.getElementById("music");
-    musica.play();
+const canvas = document.getElementById("radar");
+const ctx = canvas.getContext("2d");
 
-    for(let i=0;i<40;i++){
-        crearCorazon();
+const center = 175;
+const maxDist = 100;
+
+
+// ==========================
+// LOG
+// ==========================
+
+function log(txt){
+
+    const l = document.getElementById("log");
+
+    l.innerHTML += txt + "<br>";
+    l.scrollTop = l.scrollHeight;
+}
+
+
+// ==========================
+// SERIAL
+// ==========================
+
+async function conectar(){
+
+    try{
+
+        port = await navigator.serial.requestPort();
+
+        await port.open({ baudRate:9600 });
+
+        writer = port.writable.getWriter();
+        reader = port.readable.getReader();
+
+        log("✅ Conectado al Arduino");
+
+        leerSerial();
+
+    }catch(e){
+
+        alert("Error: " + e);
+
     }
 
-    alert("💖 Te amo mucho Anghely 💖\nFeliz cumpleaños mi vida 🎂");
 }
 
-// CREAR CORAZONES
-function crearCorazon(){
 
-    const heart = document.createElement("div");
-    heart.className = "heart";
-    heart.innerHTML = "❤️";
+// ==========================
+// LEER DATOS
+// ==========================
 
-    heart.style.left = Math.random() * 100 + "vw";
-    heart.style.fontSize = (15 + Math.random()*25) + "px";
-    heart.style.animationDuration = (4 + Math.random()*4) + "s";
+async function leerSerial(){
 
-    document.body.appendChild(heart);
+    let buffer = "";
 
-    setTimeout(()=>{
-        heart.remove();
-    },6000);
+    while(true){
+
+        const { value, done } = await reader.read();
+
+        if(done) break;
+
+        buffer += new TextDecoder().decode(value);
+
+        if(buffer.includes("\n")){
+
+            let lines = buffer.split("\n");
+
+            buffer = lines.pop();
+
+            lines.forEach(p => procesar(p.trim()));
+
+        }
+    }
 }
 
-// CORAZONES AUTOMÁTICOS
-setInterval(crearCorazon,600);
+
+// ==========================
+// PROCESAR DATOS
+// ==========================
+
+function procesar(data){
+
+    log("🤖 " + data);
+
+    if(data.includes(",")){
+
+        let [ang, dist] = data.split(",");
+
+        dibujarRadar(
+            parseFloat(ang),
+            parseFloat(dist)
+        );
+
+    }
+}
+
+
+// ==========================
+// ENVIAR
+// ==========================
+
+async function enviar(cmd){
+
+    if(!writer){
+
+        alert("Conecta primero");
+        return;
+
+    }
+
+    await writer.write(
+        new TextEncoder().encode(cmd + "\n")
+    );
+
+    log("📤 " + cmd);
+
+}
+
+
+// ==========================
+// RADAR
+// ==========================
+
+function baseRadar(){
+
+    ctx.clearRect(0,0,350,350);
+
+    ctx.strokeStyle="lime";
+    ctx.lineWidth=1;
+
+    // Circulos
+    for(let i=1;i<=4;i++){
+
+        let r = i*(center/4);
+
+        ctx.beginPath();
+        ctx.arc(center,center,r,0,Math.PI*2);
+        ctx.stroke();
+
+        ctx.fillStyle="lime";
+        ctx.fillText(
+            Math.round(i*maxDist/4)+"cm",
+            center-15,
+            center-r+10
+        );
+
+    }
+
+    // Cruz
+    ctx.beginPath();
+    ctx.moveTo(0,center);
+    ctx.lineTo(350,center);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(center,0);
+    ctx.lineTo(center,350);
+    ctx.stroke();
+
+}
+
+
+// ==========================
+// DIBUJAR
+// ==========================
+
+function dibujarRadar(ang, dist){
+
+    baseRadar();
+
+    if(dist > maxDist) dist = maxDist;
+
+    let r = (dist/maxDist)*center;
+
+    let rad = ang * Math.PI/180;
+
+    let x = center + r*Math.cos(rad);
+    let y = center - r*Math.sin(rad);
+
+    // Punto
+    ctx.fillStyle="red";
+
+    ctx.beginPath();
+    ctx.arc(x,y,5,0,Math.PI*2);
+    ctx.fill();
+
+    // Rayo
+    ctx.strokeStyle="lime";
+    ctx.lineWidth=2;
+
+    let x2 = center + center*Math.cos(rad);
+    let y2 = center - center*Math.sin(rad);
+
+    ctx.beginPath();
+    ctx.moveTo(center,center);
+    ctx.lineTo(x2,y2);
+    ctx.stroke();
+
+    // Texto
+    ctx.fillStyle="white";
+
+    ctx.fillText(
+        `A:${ang}° D:${dist}cm`,
+        10,20
+    );
+
+}
+
+
+// Inicial
+baseRadar();
+log("✅ Sistema listo");
 
 </script>
 
