@@ -7,6 +7,7 @@
 <style>
 body { font-family: Arial; text-align: center; }
 
+/* GRID */
 .grid {
     display: grid;
     grid-template-columns: repeat(15, 50px);
@@ -14,6 +15,7 @@ body { font-family: Arial; text-align: center; }
     justify-content: center;
 }
 
+/* LIBRES */
 .celda {
     width: 50px;
     height: 50px;
@@ -27,6 +29,7 @@ body { font-family: Arial; text-align: center; }
     color: white;
 }
 
+/* ESTADOS */
 .seleccionado { background: yellow; color: black; }
 .ocupado { background: red; color: white; }
 .liberar { background: green; color: white; }
@@ -51,6 +54,7 @@ body { font-family: Arial; text-align: center; }
 
 </style>
 
+<!-- Excel -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 </head>
@@ -105,6 +109,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// Imagen
 let imagen = new Image()
 imagen.src = "i1.png"
 
@@ -115,13 +120,12 @@ let ultimosAsignados = []
 let estadoPago = "Pagado"
 let estadoEntrega = "Recogido"
 
-// BOTONES TOGGLE
+// BOTONES
 function activarBoton(grupo, activo){
     grupo.forEach(btn => btn.classList.remove("activo"))
     activo.classList.add("activo")
 }
 
-// PAGO
 const btnPagado = document.getElementById("btnPagado")
 const btnDebe = document.getElementById("btnDebe")
 
@@ -135,7 +139,6 @@ btnDebe.onclick = () => {
     activarBoton([btnPagado, btnDebe], btnDebe)
 }
 
-// ENTREGA
 const btnRecogido = document.getElementById("btnRecogido")
 const btnNoRecogido = document.getElementById("btnNoRecogido")
 
@@ -198,6 +201,7 @@ function renderGrid(){
     }
 }
 
+// TIEMPO REAL
 onSnapshot(collection(db, "boletos"), (snapshot) => {
     data = {}
     snapshot.forEach((docu) => {
@@ -238,6 +242,76 @@ window.liberar = async function(){
         }
     }
     seleccionados = []
+}
+
+// GENERAR IMÁGENES
+window.descargar = function(){
+
+    if(ultimosAsignados.length === 0){
+        alert("No hay boletos nuevos")
+        return
+    }
+
+    const canvas = document.getElementById("canvas")
+    const ctx = canvas.getContext("2d")
+
+    for(let numero of ultimosAsignados){
+
+        canvas.width = imagen.width
+        canvas.height = imagen.height
+
+        ctx.drawImage(imagen, 0, 0)
+
+        let texto = numero + " - " + data[numero].nombre
+
+        ctx.font = "30px Arial"
+
+        let w = ctx.measureText(texto).width
+
+        let x = canvas.width - w - 40
+        let y = canvas.height - 40
+
+        ctx.fillStyle = "white"
+        ctx.fillRect(x-10, y-30, w+20, 40)
+
+        ctx.fillStyle = "black"
+        ctx.fillText(texto, x, y)
+
+        let link = document.createElement("a")
+        link.download = numero + ".png"
+        link.href = canvas.toDataURL()
+        link.click()
+    }
+
+    ultimosAsignados = []
+}
+
+// EXPORTAR EXCEL
+window.exportarExcel = function(){
+
+    let datos = [["Numero","Nombre","Pago","Entrega"]]
+
+    for(let i=1; i<=150; i++){
+        let num = String(i).padStart(3,'0')
+
+        if(data[num]){
+            datos.push([
+                num,
+                data[num].nombre,
+                data[num].pago,
+                data[num].entrega
+            ])
+        } else {
+            datos.push([num,"LIBRE","",""])
+        }
+    }
+
+    let wb = XLSX.utils.book_new()
+    let ws = XLSX.utils.aoa_to_sheet(datos)
+
+    XLSX.utils.book_append_sheet(wb, ws, "Boletos")
+
+    XLSX.writeFile(wb, "boletos.xlsx")
 }
 
 </script>
