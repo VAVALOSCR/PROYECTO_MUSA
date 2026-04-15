@@ -7,7 +7,6 @@
 <style>
 body { font-family: Arial; text-align: center; }
 
-/* GRID */
 .grid {
     display: grid;
     grid-template-columns: repeat(15, 50px);
@@ -15,7 +14,6 @@ body { font-family: Arial; text-align: center; }
     justify-content: center;
 }
 
-/* LIBRES (AZUL) */
 .celda {
     width: 50px;
     height: 50px;
@@ -29,14 +27,30 @@ body { font-family: Arial; text-align: center; }
     color: white;
 }
 
-/* ESTADOS */
 .seleccionado { background: yellow; color: black; }
 .ocupado { background: red; color: white; }
 .liberar { background: green; color: white; }
 
+/* BOTONES */
+.btn {
+    padding: 8px 12px;
+    margin: 5px;
+    border: none;
+    cursor: pointer;
+    color: white;
+    border-radius: 5px;
+}
+
+.activo { border: 3px solid black; }
+
+.pagado { background: green; }
+.debe { background: red; }
+
+.recogido { background: green; }
+.norecogido { background: gray; }
+
 </style>
 
-<!-- Excel PRO -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 </head>
@@ -46,6 +60,16 @@ body { font-family: Arial; text-align: center; }
 <h2>🎟 Sistema de Boletos</h2>
 
 <input type="text" id="nombre" placeholder="Nombre"><br><br>
+
+<h4>Pago</h4>
+<button class="btn pagado activo" id="btnPagado">Pagado</button>
+<button class="btn debe" id="btnDebe">Debe</button>
+
+<h4>Entrega</h4>
+<button class="btn recogido activo" id="btnRecogido">Recogido</button>
+<button class="btn norecogido" id="btnNoRecogido">No recogido</button>
+
+<br><br>
 
 <button onclick="asignar()">Asignar</button>
 <button onclick="liberar()">Liberar</button>
@@ -57,11 +81,7 @@ body { font-family: Arial; text-align: center; }
 🔴 Vendidos: <span id="vendidos">0</span>
 </h3>
 
-<p>
-🔵 Libres | 🔴 Vendidos | 🟢 Liberar
-</p>
-
-<br>
+<p>🔵 Libres | 🔴 Vendidos | 🟢 Liberar</p>
 
 <div class="grid" id="grid"></div>
 
@@ -85,13 +105,49 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Imagen base
 let imagen = new Image()
 imagen.src = "i1.png"
 
 let seleccionados = []
 let data = {}
 let ultimosAsignados = []
+
+let estadoPago = "Pagado"
+let estadoEntrega = "Recogido"
+
+// BOTONES TOGGLE
+function activarBoton(grupo, activo){
+    grupo.forEach(btn => btn.classList.remove("activo"))
+    activo.classList.add("activo")
+}
+
+// PAGO
+const btnPagado = document.getElementById("btnPagado")
+const btnDebe = document.getElementById("btnDebe")
+
+btnPagado.onclick = () => {
+    estadoPago = "Pagado"
+    activarBoton([btnPagado, btnDebe], btnPagado)
+}
+
+btnDebe.onclick = () => {
+    estadoPago = "Debe"
+    activarBoton([btnPagado, btnDebe], btnDebe)
+}
+
+// ENTREGA
+const btnRecogido = document.getElementById("btnRecogido")
+const btnNoRecogido = document.getElementById("btnNoRecogido")
+
+btnRecogido.onclick = () => {
+    estadoEntrega = "Recogido"
+    activarBoton([btnRecogido, btnNoRecogido], btnRecogido)
+}
+
+btnNoRecogido.onclick = () => {
+    estadoEntrega = "No recogido"
+    activarBoton([btnRecogido, btnNoRecogido], btnNoRecogido)
+}
 
 const grid = document.getElementById("grid")
 
@@ -115,7 +171,12 @@ function renderGrid(){
 
         if(data[num]){
             div.classList.add("ocupado")
-            div.title = "Vendido a: " + data[num]
+
+            let info = data[num]
+            div.title =
+                "Nombre: " + info.nombre + "\n" +
+                "Pago: " + info.pago + "\n" +
+                "Entrega: " + info.entrega
         }
 
         div.onclick = () => {
@@ -137,11 +198,10 @@ function renderGrid(){
     }
 }
 
-// TIEMPO REAL
 onSnapshot(collection(db, "boletos"), (snapshot) => {
     data = {}
     snapshot.forEach((docu) => {
-        data[docu.id] = docu.data().nombre
+        data[docu.id] = docu.data()
     })
     renderGrid()
     actualizarContador()
@@ -159,7 +219,11 @@ window.asignar = async function(){
     ultimosAsignados = []
 
     for(let num of seleccionados){
-        await setDoc(doc(db, "boletos", num), {nombre})
+        await setDoc(doc(db, "boletos", num), {
+            nombre,
+            pago: estadoPago,
+            entrega: estadoEntrega
+        })
         ultimosAsignados.push(num)
     }
 
@@ -174,67 +238,6 @@ window.liberar = async function(){
         }
     }
     seleccionados = []
-}
-
-// GENERAR IMÁGENES
-window.descargar = function(){
-
-    if(ultimosAsignados.length === 0){
-        alert("No hay boletos nuevos")
-        return
-    }
-
-    const canvas = document.getElementById("canvas")
-    const ctx = canvas.getContext("2d")
-
-    for(let numero of ultimosAsignados){
-
-        canvas.width = imagen.width
-        canvas.height = imagen.height
-
-        ctx.drawImage(imagen, 0, 0)
-
-        let texto = numero + " - " + data[numero]
-
-        ctx.font = "30px Arial"
-
-        let w = ctx.measureText(texto).width
-
-        let x = canvas.width - w - 40
-        let y = canvas.height - 40
-
-        ctx.fillStyle = "white"
-        ctx.fillRect(x-10, y-30, w+20, 40)
-
-        ctx.fillStyle = "black"
-        ctx.fillText(texto, x, y)
-
-        let link = document.createElement("a")
-        link.download = numero + ".png"
-        link.href = canvas.toDataURL()
-        link.click()
-    }
-
-    ultimosAsignados = []
-}
-
-// EXPORTAR EXCEL
-window.exportarExcel = function(){
-
-    let datos = [["Numero", "Nombre"]]
-
-    for(let i=1; i<=150; i++){
-        let num = String(i).padStart(3,'0')
-        let nombre = data[num] || "LIBRE"
-        datos.push([num, nombre])
-    }
-
-    let wb = XLSX.utils.book_new()
-    let ws = XLSX.utils.aoa_to_sheet(datos)
-
-    XLSX.utils.book_append_sheet(wb, ws, "Boletos")
-
-    XLSX.writeFile(wb, "boletos.xlsx")
 }
 
 </script>
