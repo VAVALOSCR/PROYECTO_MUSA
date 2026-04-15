@@ -1,329 +1,145 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Control Carrito + Radar (Serial)</title>
+<title>Boletos</title>
 
 <style>
+body { font-family: Arial; text-align: center; }
 
-body{
-    font-family: Arial;
-    background:#ecf3f9;
-    text-align:center;
+.grid {
+    display: grid;
+    grid-template-columns: repeat(15, 50px);
+    gap: 5px;
+    justify-content: center;
 }
 
-h2{
-    margin:5px;
-}
-
-/* PANEL */
-
-#panel{
+.celda {
+    width: 50px;
+    height: 50px;
+    border: 1px solid black;
+    cursor: pointer;
+    font-size: 12px;
     display:flex;
+    align-items:center;
     justify-content:center;
-    gap:20px;
 }
 
-/* BOTONES */
-
-button{
-    font-size:20px;
-    width:60px;
-    height:60px;
-    cursor:pointer;
+.seleccionado {
+    background: yellow;
 }
-
-/* RADAR */
-
-canvas{
-    background:black;
-    margin:10px;
-    border:2px solid #333;
-}
-
-/* LOG */
-
-#log{
-    width:90%;
-    height:120px;
-    margin:auto;
-    background:black;
-    color:lime;
-    font-family: Consolas;
-    overflow:auto;
-    padding:5px;
-}
-
 </style>
 </head>
 
 <body>
 
-<h2>CONTROL REMOTO CON RADAR (SERIAL)</h2>
+<h2>🎟 Sistema de Boletos</h2>
 
-<button onclick="conectar()">🔌 Conectar</button>
+<input type="file" id="imagenInput"><br><br>
+
+<input type="text" id="nombre" placeholder="Nombre"><br><br>
+
+<button onclick="asignar()">Asignar</button>
+<button onclick="descargar()">Descargar Imágenes</button>
 
 <br><br>
 
-<div id="panel">
+<div class="grid" id="grid"></div>
 
-<!-- COMANDOS -->
-<div>
-<h3>Comandos</h3>
-
-Adelante <input id="cmdF" value="F" size="2"><br>
-Atrás <input id="cmdB" value="B" size="2"><br>
-Izquierda <input id="cmdL" value="L" size="2"><br>
-Derecha <input id="cmdR" value="R" size="2"><br>
-Stop <input id="cmdS" value="S" size="2"><br>
-
-</div>
-
-<!-- CONTROL -->
-<div>
-<h3>Control</h3>
-
-<button onclick="enviar(cmdF.value)">⬆</button><br>
-
-<button onclick="enviar(cmdL.value)">⬅</button>
-<button onclick="enviar(cmdS.value)">🛑</button>
-<button onclick="enviar(cmdR.value)">➡</button><br>
-
-<button onclick="enviar(cmdB.value)">⬇</button>
-
-</div>
-
-</div>
-
-<br>
-
-<!-- RADAR -->
-<canvas id="radar" width="350" height="350"></canvas>
-
-<!-- LOG -->
-<div id="log"></div>
-
+<canvas id="canvas" style="display:none;"></canvas>
 
 <script>
+let seleccionados = []
+let data = {}
+let imagen = null
 
-let port;
-let reader;
-let writer;
+// Cargar imagen
+document.getElementById("imagenInput").addEventListener("change", function(e){
+    const file = e.target.files[0]
+    const reader = new FileReader()
 
-const canvas = document.getElementById("radar");
-const ctx = canvas.getContext("2d");
-
-const center = 175;
-const maxDist = 100;
-
-
-// ==========================
-// LOG
-// ==========================
-
-function log(txt){
-
-    const l = document.getElementById("log");
-
-    l.innerHTML += txt + "<br>";
-    l.scrollTop = l.scrollHeight;
-}
-
-
-// ==========================
-// SERIAL
-// ==========================
-
-async function conectar(){
-
-    try{
-
-        port = await navigator.serial.requestPort();
-
-        await port.open({ baudRate:9600 });
-
-        writer = port.writable.getWriter();
-        reader = port.readable.getReader();
-
-        log("✅ Conectado al Arduino");
-
-        leerSerial();
-
-    }catch(e){
-
-        alert("Error: " + e);
-
+    reader.onload = function(event){
+        imagen = new Image()
+        imagen.src = event.target.result
     }
 
-}
+    reader.readAsDataURL(file)
+})
 
+// Crear matriz 150
+const grid = document.getElementById("grid")
 
-// ==========================
-// LEER DATOS
-// ==========================
+for(let i=1; i<=150; i++){
+    let div = document.createElement("div")
+    div.className = "celda"
+    div.innerText = String(i).padStart(3,'0')
 
-async function leerSerial(){
+    div.onclick = () => {
+        div.classList.toggle("seleccionado")
 
-    let buffer = "";
-
-    while(true){
-
-        const { value, done } = await reader.read();
-
-        if(done) break;
-
-        buffer += new TextDecoder().decode(value);
-
-        if(buffer.includes("\n")){
-
-            let lines = buffer.split("\n");
-
-            buffer = lines.pop();
-
-            lines.forEach(p => procesar(p.trim()));
-
+        if(seleccionados.includes(i)){
+            seleccionados = seleccionados.filter(x => x !== i)
+        } else {
+            seleccionados.push(i)
         }
     }
+
+    grid.appendChild(div)
 }
 
+// Asignar nombre
+function asignar(){
+    let nombre = document.getElementById("nombre").value
 
-// ==========================
-// PROCESAR DATOS
-// ==========================
+    seleccionados.forEach(num => {
+        let key = String(num).padStart(3,'0')
+        data[key] = nombre
+    })
 
-function procesar(data){
-
-    log("🤖 " + data);
-
-    if(data.includes(",")){
-
-        let [ang, dist] = data.split(",");
-
-        dibujarRadar(
-            parseFloat(ang),
-            parseFloat(dist)
-        );
-
-    }
+    alert("Asignado")
 }
 
-
-// ==========================
-// ENVIAR
-// ==========================
-
-async function enviar(cmd){
-
-    if(!writer){
-
-        alert("Conecta primero");
-        return;
-
+// Generar imágenes
+function descargar(){
+    if(!imagen){
+        alert("Sube una imagen primero")
+        return
     }
 
-    await writer.write(
-        new TextEncoder().encode(cmd + "\n")
-    );
+    const canvas = document.getElementById("canvas")
+    const ctx = canvas.getContext("2d")
 
-    log("📤 " + cmd);
+    for(let numero in data){
 
-}
+        canvas.width = imagen.width
+        canvas.height = imagen.height
 
+        ctx.drawImage(imagen, 0, 0)
 
-// ==========================
-// RADAR
-// ==========================
+        let texto = numero + " - " + data[numero]
 
-function baseRadar(){
+        ctx.font = "30px Arial"
 
-    ctx.clearRect(0,0,350,350);
+        let textWidth = ctx.measureText(texto).width
 
-    ctx.strokeStyle="lime";
-    ctx.lineWidth=1;
+        let x = canvas.width - textWidth - 40
+        let y = canvas.height - 40
 
-    // Circulos
-    for(let i=1;i<=4;i++){
+        // fondo blanco
+        ctx.fillStyle = "white"
+        ctx.fillRect(x-10, y-30, textWidth+20, 40)
 
-        let r = i*(center/4);
+        // texto
+        ctx.fillStyle = "black"
+        ctx.fillText(texto, x, y)
 
-        ctx.beginPath();
-        ctx.arc(center,center,r,0,Math.PI*2);
-        ctx.stroke();
-
-        ctx.fillStyle="lime";
-        ctx.fillText(
-            Math.round(i*maxDist/4)+"cm",
-            center-15,
-            center-r+10
-        );
-
+        // descargar
+        let link = document.createElement("a")
+        link.download = numero + ".png"
+        link.href = canvas.toDataURL()
+        link.click()
     }
-
-    // Cruz
-    ctx.beginPath();
-    ctx.moveTo(0,center);
-    ctx.lineTo(350,center);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(center,0);
-    ctx.lineTo(center,350);
-    ctx.stroke();
-
 }
-
-
-// ==========================
-// DIBUJAR
-// ==========================
-
-function dibujarRadar(ang, dist){
-
-    baseRadar();
-
-    if(dist > maxDist) dist = maxDist;
-
-    let r = (dist/maxDist)*center;
-
-    let rad = ang * Math.PI/180;
-
-    let x = center + r*Math.cos(rad);
-    let y = center - r*Math.sin(rad);
-
-    // Punto
-    ctx.fillStyle="red";
-
-    ctx.beginPath();
-    ctx.arc(x,y,5,0,Math.PI*2);
-    ctx.fill();
-
-    // Rayo
-    ctx.strokeStyle="lime";
-    ctx.lineWidth=2;
-
-    let x2 = center + center*Math.cos(rad);
-    let y2 = center - center*Math.sin(rad);
-
-    ctx.beginPath();
-    ctx.moveTo(center,center);
-    ctx.lineTo(x2,y2);
-    ctx.stroke();
-
-    // Texto
-    ctx.fillStyle="white";
-
-    ctx.fillText(
-        `A:${ang}° D:${dist}cm`,
-        10,20
-    );
-
-}
-
-
-// Inicial
-baseRadar();
-log("✅ Sistema listo");
-
 </script>
 
 </body>
