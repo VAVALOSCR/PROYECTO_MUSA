@@ -27,7 +27,12 @@ body { font-family: Arial; text-align: center; }
 
 .seleccionado { background: yellow; }
 .ocupado { background: red; color: white; }
+.liberar { background: green; color: white; }
 </style>
+
+<!-- Excel PRO -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
 </head>
 
 <body>
@@ -41,7 +46,12 @@ body { font-family: Arial; text-align: center; }
 <button onclick="descargar()">Generar Imágenes</button>
 <button onclick="exportarExcel()">Exportar Excel</button>
 
-<br><br>
+<h3>
+🟢 Libres: <span id="libres">0</span> |
+🔴 Vendidos: <span id="vendidos">0</span>
+</h3>
+
+<br>
 
 <div class="grid" id="grid"></div>
 
@@ -49,12 +59,10 @@ body { font-family: Arial; text-align: center; }
 
 <script type="module">
 
-// 🔥 FIREBASE (SIN ANALYTICS)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } 
 from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
-// TU CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyANkyhYoCL1hMMW0taqf7XSEvDwapHT1O8",
   authDomain: "polladag.firebaseapp.com",
@@ -67,17 +75,24 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Imagen base
+// Imagen
 let imagen = new Image()
 imagen.src = "i1.png"
 
-// Datos
 let seleccionados = []
 let data = {}
+let ultimosAsignados = []
 
 const grid = document.getElementById("grid")
 
-// Renderizar matriz
+function actualizarContador(){
+    let vendidos = Object.keys(data).length
+    let libres = 150 - vendidos
+
+    document.getElementById("vendidos").innerText = vendidos
+    document.getElementById("libres").innerText = libres
+}
+
 function renderGrid(){
     grid.innerHTML = ""
 
@@ -88,10 +103,18 @@ function renderGrid(){
         div.className = "celda"
         div.innerText = num
 
-        if(data[num]) div.classList.add("ocupado")
+        if(data[num]){
+            div.classList.add("ocupado")
+            div.title = "Vendido a: " + data[num]
+        }
 
         div.onclick = () => {
-            div.classList.toggle("seleccionado")
+
+            if(data[num]){
+                div.classList.toggle("liberar")
+            } else {
+                div.classList.toggle("seleccionado")
+            }
 
             if(seleccionados.includes(num)){
                 seleccionados = seleccionados.filter(x => x !== num)
@@ -111,9 +134,10 @@ onSnapshot(collection(db, "boletos"), (snapshot) => {
         data[docu.id] = docu.data().nombre
     })
     renderGrid()
+    actualizarContador()
 })
 
-// Asignar
+// ASIGNAR
 window.asignar = async function(){
     let nombre = document.getElementById("nombre").value
 
@@ -122,49 +146,38 @@ window.asignar = async function(){
         return
     }
 
+    ultimosAsignados = []
+
     for(let num of seleccionados){
-        await setDoc(doc(db, "boletos", num), {nombre: nombre})
+        await setDoc(doc(db, "boletos", num), {nombre})
+        ultimosAsignados.push(num)
     }
 
     seleccionados = []
 }
 
-// Liberar
+// LIBERAR
 window.liberar = async function(){
     for(let num of seleccionados){
-        await deleteDoc(doc(db, "boletos", num))
+        if(data[num]){
+            await deleteDoc(doc(db, "boletos", num))
+        }
     }
-
     seleccionados = []
 }
 
-// Exportar Excel
-window.exportarExcel = function(){
-    let csv = "Numero,Nombre\n"
-
-    for(let num in data){
-        csv += num + "," + data[num] + "\n"
-    }
-
-    let blob = new Blob([csv], {type: "text/csv"})
-    let link = document.createElement("a")
-    link.href = URL.createObjectURL(blob)
-    link.download = "boletos.csv"
-    link.click()
-}
-
-// Generar imágenes
+// GENERAR IMÁGENES
 window.descargar = function(){
 
-    if(!imagen.complete){
-        alert("Imagen no cargada")
+    if(ultimosAsignados.length === 0){
+        alert("No hay boletos nuevos")
         return
     }
 
     const canvas = document.getElementById("canvas")
     const ctx = canvas.getContext("2d")
 
-    for(let numero in data){
+    for(let numero of ultimosAsignados){
 
         canvas.width = imagen.width
         canvas.height = imagen.height
@@ -191,6 +204,27 @@ window.descargar = function(){
         link.href = canvas.toDataURL()
         link.click()
     }
+
+    ultimosAsignados = []
+}
+
+// 📊 EXPORTAR EXCEL PRO
+window.exportarExcel = function(){
+
+    let datos = [["Numero", "Nombre"]]
+
+    for(let i=1; i<=150; i++){
+        let num = String(i).padStart(3,'0')
+        let nombre = data[num] || "LIBRE"
+        datos.push([num, nombre])
+    }
+
+    let wb = XLSX.utils.book_new()
+    let ws = XLSX.utils.aoa_to_sheet(datos)
+
+    XLSX.utils.book_append_sheet(wb, ws, "Boletos")
+
+    XLSX.writeFile(wb, "boletos.xlsx")
 }
 
 </script>
