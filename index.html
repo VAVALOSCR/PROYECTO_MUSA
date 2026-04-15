@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Boletos</title>
+<title>Boletos Tipo Cine</title>
 
 <style>
 body { font-family: Arial; text-align: center; }
@@ -35,12 +35,10 @@ body { font-family: Arial; text-align: center; }
 
 <h2>🎟 Sistema de Boletos</h2>
 
-<input type="file" id="imagenInput"><br><br>
-
 <input type="text" id="nombre" placeholder="Nombre"><br><br>
 
 <button onclick="asignar()">Asignar</button>
-<button onclick="descargar()">Descargar Imágenes</button>
+<button onclick="descargar()">Generar Imágenes</button>
 
 <br><br>
 
@@ -49,24 +47,15 @@ body { font-family: Arial; text-align: center; }
 <canvas id="canvas" style="display:none;"></canvas>
 
 <script>
+
+// IMAGEN FIJA
+let imagen = new Image()
+imagen.src = "i1.png"
+
 let seleccionados = []
 let data = {}
-let imagen = null
 
-// Cargar imagen
-document.getElementById("imagenInput").addEventListener("change", function(e){
-    const file = e.target.files[0]
-    const reader = new FileReader()
-
-    reader.onload = function(event){
-        imagen = new Image()
-        imagen.src = event.target.result
-    }
-
-    reader.readAsDataURL(file)
-})
-
-// Crear matriz 150
+// Crear matriz 10x15 (150 boletos)
 const grid = document.getElementById("grid")
 
 for(let i=1; i<=150; i++){
@@ -87,7 +76,7 @@ for(let i=1; i<=150; i++){
     grid.appendChild(div)
 }
 
-// Asignar nombre
+// Asignar nombre a seleccionados
 function asignar(){
     let nombre = document.getElementById("nombre").value
 
@@ -96,13 +85,13 @@ function asignar(){
         data[key] = nombre
     })
 
-    alert("Asignado")
+    alert("✅ Asignado")
 }
 
 // Generar imágenes
 function descargar(){
-    if(!imagen){
-        alert("Sube una imagen primero")
+    if(!imagen.complete){
+        alert("La imagen aún no carga")
         return
     }
 
@@ -122,8 +111,10 @@ function descargar(){
 
         let textWidth = ctx.measureText(texto).width
 
-        let x = canvas.width - textWidth - 40
-        let y = canvas.height - 40
+        // POSICIÓN INFERIOR DERECHA CON MARGEN
+        let margen = 40
+        let x = canvas.width - textWidth - margen
+        let y = canvas.height - margen
 
         // fondo blanco
         ctx.fillStyle = "white"
