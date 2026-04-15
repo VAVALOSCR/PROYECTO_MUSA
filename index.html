@@ -25,14 +25,8 @@ body { font-family: Arial; text-align: center; }
     justify-content:center;
 }
 
-.seleccionado {
-    background: yellow;
-}
-
-.ocupado {
-    background: red;
-    color: white;
-}
+.seleccionado { background: yellow; }
+.ocupado { background: red; color: white; }
 </style>
 </head>
 
@@ -45,6 +39,7 @@ body { font-family: Arial; text-align: center; }
 <button onclick="asignar()">Asignar</button>
 <button onclick="liberar()">Liberar</button>
 <button onclick="descargar()">Generar Imágenes</button>
+<button onclick="exportarExcel()">Exportar Excel</button>
 
 <br><br>
 
@@ -52,38 +47,56 @@ body { font-family: Arial; text-align: center; }
 
 <canvas id="canvas" style="display:none;"></canvas>
 
-<script>
+<script type="module">
 
-// Imagen fija
+// 🔥 FIREBASE (SIN ANALYTICS)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } 
+from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+
+// TU CONFIG
+const firebaseConfig = {
+  apiKey: "AIzaSyANkyhYoCL1hMMW0taqf7XSEvDwapHT1O8",
+  authDomain: "polladag.firebaseapp.com",
+  projectId: "polladag",
+  storageBucket: "polladag.firebasestorage.app",
+  messagingSenderId: "392850708569",
+  appId: "1:392850708569:web:f901a1d0fa6d7c7da1f948"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Imagen base
 let imagen = new Image()
 imagen.src = "i1.png"
 
+// Datos
 let seleccionados = []
-let data = JSON.parse(localStorage.getItem("boletos")) || {}
+let data = {}
 
 const grid = document.getElementById("grid")
 
+// Renderizar matriz
 function renderGrid(){
     grid.innerHTML = ""
 
     for(let i=1; i<=150; i++){
-        let numStr = String(i).padStart(3,'0')
+        let num = String(i).padStart(3,'0')
 
         let div = document.createElement("div")
         div.className = "celda"
-        div.innerText = numStr
+        div.innerText = num
 
-        if(data[numStr]){
-            div.classList.add("ocupado")
-        }
+        if(data[num]) div.classList.add("ocupado")
 
         div.onclick = () => {
             div.classList.toggle("seleccionado")
 
-            if(seleccionados.includes(numStr)){
-                seleccionados = seleccionados.filter(x => x !== numStr)
+            if(seleccionados.includes(num)){
+                seleccionados = seleccionados.filter(x => x !== num)
             } else {
-                seleccionados.push(numStr)
+                seleccionados.push(num)
             }
         }
 
@@ -91,10 +104,17 @@ function renderGrid(){
     }
 }
 
-renderGrid()
+// 🔄 TIEMPO REAL
+onSnapshot(collection(db, "boletos"), (snapshot) => {
+    data = {}
+    snapshot.forEach((docu) => {
+        data[docu.id] = docu.data().nombre
+    })
+    renderGrid()
+})
 
 // Asignar
-function asignar(){
+window.asignar = async function(){
     let nombre = document.getElementById("nombre").value
 
     if(!nombre){
@@ -102,31 +122,39 @@ function asignar(){
         return
     }
 
-    seleccionados.forEach(num => {
-        data[num] = nombre
-    })
+    for(let num of seleccionados){
+        await setDoc(doc(db, "boletos", num), {nombre: nombre})
+    }
 
-    guardar()
-}
-
-// Liberar boletos
-function liberar(){
-    seleccionados.forEach(num => {
-        delete data[num]
-    })
-
-    guardar()
-}
-
-// Guardar en navegador
-function guardar(){
-    localStorage.setItem("boletos", JSON.stringify(data))
     seleccionados = []
-    renderGrid()
 }
 
-// Generar imágenes SOLO de los asignados
-function descargar(){
+// Liberar
+window.liberar = async function(){
+    for(let num of seleccionados){
+        await deleteDoc(doc(db, "boletos", num))
+    }
+
+    seleccionados = []
+}
+
+// Exportar Excel
+window.exportarExcel = function(){
+    let csv = "Numero,Nombre\n"
+
+    for(let num in data){
+        csv += num + "," + data[num] + "\n"
+    }
+
+    let blob = new Blob([csv], {type: "text/csv"})
+    let link = document.createElement("a")
+    link.href = URL.createObjectURL(blob)
+    link.download = "boletos.csv"
+    link.click()
+}
+
+// Generar imágenes
+window.descargar = function(){
 
     if(!imagen.complete){
         alert("Imagen no cargada")
@@ -147,27 +175,24 @@ function descargar(){
 
         ctx.font = "30px Arial"
 
-        let textWidth = ctx.measureText(texto).width
+        let w = ctx.measureText(texto).width
 
-        let margen = 40
-        let x = canvas.width - textWidth - margen
-        let y = canvas.height - margen
+        let x = canvas.width - w - 40
+        let y = canvas.height - 40
 
-        // fondo blanco
         ctx.fillStyle = "white"
-        ctx.fillRect(x-10, y-30, textWidth+20, 40)
+        ctx.fillRect(x-10, y-30, w+20, 40)
 
-        // texto
         ctx.fillStyle = "black"
         ctx.fillText(texto, x, y)
 
-        // descargar SOLO asignados
         let link = document.createElement("a")
         link.download = numero + ".png"
         link.href = canvas.toDataURL()
         link.click()
     }
 }
+
 </script>
 
 </body>
