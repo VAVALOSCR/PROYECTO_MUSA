@@ -7,6 +7,7 @@
 <style>
 body { font-family: Arial; text-align: center; }
 
+/* GRID */
 .grid {
     display: grid;
     grid-template-columns: repeat(15, 50px);
@@ -14,23 +15,29 @@ body { font-family: Arial; text-align: center; }
     justify-content: center;
 }
 
+/* LIBRES */
 .celda {
     width: 50px;
     height: 50px;
     border: 1px solid black;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 10px;
+    line-height: 1.1;
+    text-align: center;
     display:flex;
     align-items:center;
     justify-content:center;
+    flex-direction: column;
     background: #007bff;
     color: white;
 }
 
+/* ESTADOS */
 .seleccionado { background: yellow; color: black; }
 .ocupado { background: red; color: white; }
 .liberar { background: green; color: white; }
 
+/* BOTONES */
 .btn {
     padding: 8px 12px;
     margin: 5px;
@@ -47,6 +54,7 @@ body { font-family: Arial; text-align: center; }
 
 .recogido { background: green; }
 .norecogido { background: gray; }
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -103,6 +111,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// Imagen
 let imagen = new Image()
 imagen.src = "i1.png"
 
@@ -163,16 +172,29 @@ function renderGrid(){
 
         let div = document.createElement("div")
         div.className = "celda"
-        div.innerText = num
 
         if(data[num]){
             div.classList.add("ocupado")
 
             let info = data[num]
+
+            let pago = info.pago === "Pagado" ? "P" : "D"
+            let entrega = info.entrega === "Recogido" ? "R" : "NR"
+            let nombreCorto = info.nombre.substring(0,6)
+
+            div.innerHTML = `
+                ${num}<br>
+                ${nombreCorto}<br>
+                ${pago}-${entrega}
+            `
+
             div.title =
                 "Nombre: " + info.nombre + "\n" +
                 "Pago: " + info.pago + "\n" +
                 "Entrega: " + info.entrega
+
+        } else {
+            div.innerText = num
         }
 
         div.onclick = () => {
@@ -180,7 +202,6 @@ function renderGrid(){
             if(data[num]){
                 div.classList.toggle("liberar")
 
-                // 🔥 CARGAR DATOS
                 document.getElementById("nombre").value = data[num].nombre
 
                 if(data[num].pago === "Pagado"){
@@ -214,6 +235,7 @@ function renderGrid(){
     }
 }
 
+// TIEMPO REAL
 onSnapshot(collection(db, "boletos"), (snapshot) => {
     data = {}
     snapshot.forEach((docu) => {
