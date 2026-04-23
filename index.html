@@ -28,13 +28,13 @@ body { font-family: Arial; text-align: center; }
     align-items:center;
     justify-content:center;
     flex-direction: column;
-    background: #007bff;
+    background: #007bff; /* 🔵 SOLO libres */
     color: white;
 }
 
 /* ESTADOS */
 .seleccionado { background: yellow; color: black; }
-.ocupado { background: red; color: white; }
+.ocupado { color: white; } /* ya no rojo */
 .liberar { background: green; color: white; }
 
 /* BOTONES */
@@ -87,7 +87,7 @@ body { font-family: Arial; text-align: center; }
 🔴 Vendidos: <span id="vendidos">0</span>
 </h3>
 
-<p>🔵 Libres | 🔴 Vendidos | 🟢 Liberar</p>
+<p>🔵 Libres | 🎨 Ocupados por persona | 🟢 Liberar</p>
 
 <div class="grid" id="grid"></div>
 
@@ -121,6 +121,33 @@ let ultimosAsignados = []
 
 let estadoPago = "Pagado"
 let estadoEntrega = "Recogido"
+
+// 🎨 COLOR POR NOMBRE
+function colorPorNombre(nombre){
+    let hash = 0
+    for(let i = 0; i < nombre.length; i++){
+        hash = nombre.charCodeAt(i) + ((hash << 5) - hash)
+    }
+
+    let color = "#"
+    for(let i = 0; i < 3; i++){
+        let value = (hash >> (i * 8)) & 255
+        color += ("00" + value.toString(16)).slice(-2)
+    }
+
+    return color
+}
+
+// 🧠 TEXTO LEGIBLE
+function colorTexto(bgColor){
+    let r = parseInt(bgColor.substr(1,2),16)
+    let g = parseInt(bgColor.substr(3,2),16)
+    let b = parseInt(bgColor.substr(5,2),16)
+
+    let luminosidad = (0.299*r + 0.587*g + 0.114*b)
+
+    return luminosidad > 186 ? "black" : "white"
+}
 
 // BOTONES
 function activarBoton(grupo, activo){
@@ -158,7 +185,7 @@ const grid = document.getElementById("grid")
 
 function actualizarContador(){
     let vendidos = Object.keys(data).length
-    let libres = 225 - vendidos   // ✅ CAMBIO
+    let libres = 225 - vendidos
 
     document.getElementById("vendidos").innerText = vendidos
     document.getElementById("libres").innerText = libres
@@ -167,7 +194,7 @@ function actualizarContador(){
 function renderGrid(){
     grid.innerHTML = ""
 
-    for(let i=1; i<=225; i++){   // ✅ CAMBIO
+    for(let i=1; i<=225; i++){
         let num = String(i).padStart(3,'0')
 
         let div = document.createElement("div")
@@ -181,6 +208,11 @@ function renderGrid(){
             let pago = info.pago === "Pagado" ? "P" : "D"
             let entrega = info.entrega === "Recogido" ? "R" : "NR"
             let nombreCorto = info.nombre.substring(0,6)
+
+            let color = colorPorNombre(info.nombre)
+
+            div.style.background = color
+            div.style.color = colorTexto(color)
 
             div.innerHTML = `
                 ${num}<br>
@@ -245,7 +277,7 @@ onSnapshot(collection(db, "boletos"), (snapshot) => {
     actualizarContador()
 })
 
-// ASIGNAR / ACTUALIZAR
+// ASIGNAR
 window.asignar = async function(){
 
     let nombreInput = document.getElementById("nombre").value
@@ -286,7 +318,7 @@ window.liberar = async function(){
     seleccionados = []
 }
 
-// GENERAR IMÁGENES
+// IMÁGENES
 window.descargar = function(){
 
     if(ultimosAsignados.length === 0){
@@ -328,12 +360,12 @@ window.descargar = function(){
     ultimosAsignados = []
 }
 
-// EXPORTAR EXCEL
+// EXCEL
 window.exportarExcel = function(){
 
     let datos = [["Numero","Nombre","Pago","Entrega"]]
 
-    for(let i=1; i<=225; i++){   // ✅ CAMBIO
+    for(let i=1; i<=225; i++){
         let num = String(i).padStart(3,'0')
 
         if(data[num]){
