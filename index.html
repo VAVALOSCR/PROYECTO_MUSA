@@ -28,13 +28,13 @@ body { font-family: Arial; text-align: center; }
     align-items:center;
     justify-content:center;
     flex-direction: column;
-    background: #007bff; /* 🔵 SOLO libres */
+    background: #007bff;
     color: white;
 }
 
 /* ESTADOS */
 .seleccionado { background: yellow; color: black; }
-.ocupado { color: white; } /* ya no rojo */
+.ocupado { color: white; }
 .liberar { background: green; color: white; }
 
 /* BOTONES */
@@ -87,7 +87,7 @@ body { font-family: Arial; text-align: center; }
 🔴 Vendidos: <span id="vendidos">0</span>
 </h3>
 
-<p>🔵 Libres | 🎨 Ocupados por persona | 🟢 Liberar</p>
+<p>🔵 Libres | 🎨 Ocupados | 🟢 Liberar</p>
 
 <div class="grid" id="grid"></div>
 
@@ -205,25 +205,15 @@ function renderGrid(){
 
             let info = data[num]
 
-            let pago = info.pago === "Pagado" ? "P" : "D"
-            let entrega = info.entrega === "Recogido" ? "R" : "NR"
-            let nombreCorto = info.nombre.substring(0,6)
-
             let color = colorPorNombre(info.nombre)
-
             div.style.background = color
             div.style.color = colorTexto(color)
 
             div.innerHTML = `
                 ${num}<br>
-                ${nombreCorto}<br>
-                ${pago}-${entrega}
+                ${info.nombre.substring(0,6)}<br>
+                ${info.pago === "Pagado" ? "P" : "D"}-${info.entrega === "Recogido" ? "R" : "NR"}
             `
-
-            div.title =
-                "Nombre: " + info.nombre + "\n" +
-                "Pago: " + info.pago + "\n" +
-                "Entrega: " + info.entrega
 
         } else {
             div.innerText = num
@@ -234,22 +224,14 @@ function renderGrid(){
             if(data[num]){
                 div.classList.toggle("liberar")
 
-                document.getElementById("nombre").value = data[num].nombre
-
-                if(data[num].pago === "Pagado"){
-                    estadoPago = "Pagado"
-                    activarBoton([btnPagado, btnDebe], btnPagado)
+                // ✅ FIX LIBERAR
+                if(div.classList.contains("liberar")){
+                    div.style.background = "green"
+                    div.style.color = "white"
                 } else {
-                    estadoPago = "Debe"
-                    activarBoton([btnPagado, btnDebe], btnDebe)
-                }
-
-                if(data[num].entrega === "Recogido"){
-                    estadoEntrega = "Recogido"
-                    activarBoton([btnRecogido, btnNoRecogido], btnRecogido)
-                } else {
-                    estadoEntrega = "No recogido"
-                    activarBoton([btnRecogido, btnNoRecogido], btnNoRecogido)
+                    let color = colorPorNombre(data[num].nombre)
+                    div.style.background = color
+                    div.style.color = colorTexto(color)
                 }
 
             } else {
@@ -267,7 +249,7 @@ function renderGrid(){
     }
 }
 
-// TIEMPO REAL
+// FIREBASE
 onSnapshot(collection(db, "boletos"), (snapshot) => {
     data = {}
     snapshot.forEach((docu) => {
