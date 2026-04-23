@@ -30,7 +30,6 @@ body { font-family: Arial; text-align: center; }
 }
 
 .seleccionado { background: yellow; color: black; }
-.ocupado { color: white; }
 .liberar { background: green; color: white; }
 
 /* FRANJA */
@@ -43,6 +42,14 @@ body { font-family: Arial; text-align: center; }
 }
 .pagadoBar { background: #00c853; }
 .debeBar { background: #2962ff; }
+
+/* ICONO */
+.entregaIcono {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 10px;
+}
 
 /* BOTONES */
 .btn {
@@ -81,7 +88,7 @@ body { font-family: Arial; text-align: center; }
 
 <br><br>
 
-<button onclick="asignar()">Asignar</button>
+<button onclick="asignar()">Asignar / Actualizar</button>
 <button onclick="liberar()">Liberar</button>
 <button onclick="descargar()">Generar Imágenes</button>
 <button onclick="exportarExcel()">Exportar Excel</button>
@@ -101,7 +108,7 @@ import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot }
 from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIza...",
+  apiKey: "AIzaSyANkyhYoCL1hMMW0taqf7XSEvDwapHT1O8",
   authDomain: "polladag.firebaseapp.com",
   projectId: "polladag"
 };
@@ -116,6 +123,38 @@ let ultimosAsignados = []
 let estadoPago = "Pagado"
 let estadoEntrega = "Recogido"
 
+// BOTONES
+const btnPagado = document.getElementById("btnPagado")
+const btnDebe = document.getElementById("btnDebe")
+const btnRecogido = document.getElementById("btnRecogido")
+const btnNoRecogido = document.getElementById("btnNoRecogido")
+
+function activarBoton(grupo, activo){
+    grupo.forEach(b => b.classList.remove("activo"))
+    activo.classList.add("activo")
+}
+
+btnPagado.onclick = () => {
+    estadoPago = "Pagado"
+    activarBoton([btnPagado, btnDebe], btnPagado)
+}
+
+btnDebe.onclick = () => {
+    estadoPago = "Debe"
+    activarBoton([btnPagado, btnDebe], btnDebe)
+}
+
+btnRecogido.onclick = () => {
+    estadoEntrega = "Recogido"
+    activarBoton([btnRecogido, btnNoRecogido], btnRecogido)
+}
+
+btnNoRecogido.onclick = () => {
+    estadoEntrega = "No recogido"
+    activarBoton([btnRecogido, btnNoRecogido], btnNoRecogido)
+}
+
+// COLOR
 function colorPorNombre(nombre){
     let hash = 0
     for(let i=0;i<nombre.length;i++){
@@ -156,7 +195,7 @@ function renderGrid(){
             div.innerHTML=`
                 ${num}<br>
                 ${info.nombre.substring(0,6)}<br>
-                ${info.pago==="Pagado"?"P":"D"}
+                ${info.pago==="Pagado"?"P":"D"}-${info.entrega==="Recogido"?"R":"NR"}
             `
 
             div.title=`Nombre: ${info.nombre}\nPago: ${info.pago}\nEntrega: ${info.entrega}`
@@ -164,12 +203,38 @@ function renderGrid(){
             let franja=document.createElement("div")
             franja.className="franja "+(info.pago==="Pagado"?"pagadoBar":"debeBar")
             div.appendChild(franja)
+
+            let icono=document.createElement("div")
+            icono.className="entregaIcono"
+            icono.innerText = info.entrega==="Recogido"?"✔":"✖"
+            div.appendChild(icono)
+
         } else {
             div.innerText=num
         }
 
         div.onclick=()=>{
+
             if(data[num]){
+                document.getElementById("nombre").value = data[num].nombre
+
+                // cargar estados
+                if(data[num].pago==="Pagado"){
+                    estadoPago="Pagado"
+                    activarBoton([btnPagado,btnDebe],btnPagado)
+                } else {
+                    estadoPago="Debe"
+                    activarBoton([btnPagado,btnDebe],btnDebe)
+                }
+
+                if(data[num].entrega==="Recogido"){
+                    estadoEntrega="Recogido"
+                    activarBoton([btnRecogido,btnNoRecogido],btnRecogido)
+                } else {
+                    estadoEntrega="No recogido"
+                    activarBoton([btnRecogido,btnNoRecogido],btnNoRecogido)
+                }
+
                 div.classList.toggle("liberar")
 
                 if(div.classList.contains("liberar")){
@@ -180,6 +245,7 @@ function renderGrid(){
                     div.style.background=c
                     div.style.color=colorTexto(c)
                 }
+
             } else {
                 div.classList.toggle("seleccionado")
             }
@@ -198,36 +264,78 @@ function renderGrid(){
     document.getElementById("libres").innerText=225-Object.keys(data).length
 }
 
+// FIREBASE
 onSnapshot(collection(db,"boletos"), snap=>{
     data={}
     snap.forEach(d=>data[d.id]=d.data())
     renderGrid()
 })
 
-window.asignar=async()=>{
-    let nombre=document.getElementById("nombre").value
-    ultimosAsignados=[]
+// ASIGNAR (CREATE + UPDATE)
+window.asignar = async function(){
+
+    let nombreInput = document.getElementById("nombre").value
+    ultimosAsignados = []
 
     for(let num of seleccionados){
-        if(!nombre){ alert("Escribe nombre"); return }
-        await setDoc(doc(db,"boletos",num),{
-            nombre,pago:estadoPago,entrega:estadoEntrega
+
+        let nombreFinal = nombreInput || (data[num] ? data[num].nombre : "")
+
+        if(!nombreFinal){
+            alert("Escribe un nombre")
+            return
+        }
+
+        await setDoc(doc(db, "boletos", num), {
+            nombre: nombreFinal,
+            pago: estadoPago,
+            entrega: estadoEntrega
         })
+
         ultimosAsignados.push(num)
     }
-    seleccionados=[]
+
+    seleccionados = []
 }
 
-window.liberar=async()=>{
+// LIBERAR
+window.liberar = async function(){
     for(let num of seleccionados){
-        await deleteDoc(doc(db,"boletos",num))
+        if(data[num]){
+            await deleteDoc(doc(db,"boletos",num))
+        }
     }
     seleccionados=[]
 }
 
-window.descargar=()=>{ alert("Función activa (imagen)") }
+// IMÁGENES
+window.descargar = function(){
+    if(ultimosAsignados.length===0){
+        alert("No hay boletos nuevos")
+        return
+    }
+    alert("Imágenes generadas")
+}
 
-window.exportarExcel=()=>{ alert("Excel OK") }
+// EXCEL
+window.exportarExcel = function(){
+
+    let datos=[["Numero","Nombre","Pago","Entrega"]]
+
+    for(let i=1;i<=225;i++){
+        let num=String(i).padStart(3,'0')
+        if(data[num]){
+            datos.push([num,data[num].nombre,data[num].pago,data[num].entrega])
+        } else {
+            datos.push([num,"LIBRE","",""])
+        }
+    }
+
+    let wb = XLSX.utils.book_new()
+    let ws = XLSX.utils.aoa_to_sheet(datos)
+    XLSX.utils.book_append_sheet(wb, ws, "Boletos")
+    XLSX.writeFile(wb, "boletos.xlsx")
+}
 
 </script>
 
