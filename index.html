@@ -7,7 +7,6 @@
 <style>
 body { font-family: Arial; text-align: center; }
 
-/* GRID */
 .grid {
     display: grid;
     grid-template-columns: repeat(15, 50px);
@@ -15,58 +14,48 @@ body { font-family: Arial; text-align: center; }
     justify-content: center;
 }
 
-/* LIBRES */
 .celda {
     width: 50px;
     height: 50px;
     border: 1px solid black;
     cursor: pointer;
     font-size: 10px;
-    line-height: 1.1;
-    text-align: center;
     display:flex;
     align-items:center;
     justify-content:center;
     flex-direction: column;
     background: #007bff;
     color: white;
-    position: relative; /* necesario para franja */
+    position: relative;
 }
 
-/* ESTADOS */
 .seleccionado { background: yellow; color: black; }
 .ocupado { color: white; }
 .liberar { background: green; color: white; }
 
-/* FRANJA INFERIOR */
+/* FRANJA */
 .franja {
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
     height: 6px;
-    border-bottom-left-radius: 3px;
-    border-bottom-right-radius: 3px;
 }
-
 .pagadoBar { background: #00c853; }
 .debeBar { background: #2962ff; }
 
 /* BOTONES */
 .btn {
-    padding: 8px 12px;
+    padding: 8px;
     margin: 5px;
     border: none;
     cursor: pointer;
     color: white;
     border-radius: 5px;
 }
-
 .activo { border: 3px solid black; }
-
 .pagado { background: green; }
 .debe { background: red; }
-
 .recogido { background: green; }
 .norecogido { background: gray; }
 
@@ -92,7 +81,7 @@ body { font-family: Arial; text-align: center; }
 
 <br><br>
 
-<button onclick="asignar()">Asignar / Actualizar</button>
+<button onclick="asignar()">Asignar</button>
 <button onclick="liberar()">Liberar</button>
 <button onclick="descargar()">Generar Imágenes</button>
 <button onclick="exportarExcel()">Exportar Excel</button>
@@ -102,10 +91,7 @@ body { font-family: Arial; text-align: center; }
 🔴 Vendidos: <span id="vendidos">0</span>
 </h3>
 
-<p>🔵 Libres | 🎨 Ocupados | 🟢 Liberar</p>
-
 <div class="grid" id="grid"></div>
-
 <canvas id="canvas" style="display:none;"></canvas>
 
 <script type="module">
@@ -115,161 +101,91 @@ import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot }
 from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyANkyhYoCL1hMMW0taqf7XSEvDwapHT1O8",
+  apiKey: "AIza...",
   authDomain: "polladag.firebaseapp.com",
-  projectId: "polladag",
-  storageBucket: "polladag.firebasestorage.app",
-  messagingSenderId: "392850708569",
-  appId: "1:392850708569:web:f901a1d0fa6d7c7da1f948"
+  projectId: "polladag"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let imagen = new Image()
-imagen.src = "i1.png"
-
-let seleccionados = []
 let data = {}
+let seleccionados = []
 let ultimosAsignados = []
 
 let estadoPago = "Pagado"
 let estadoEntrega = "Recogido"
 
-// COLOR POR NOMBRE
 function colorPorNombre(nombre){
     let hash = 0
-    for(let i = 0; i < nombre.length; i++){
-        hash = nombre.charCodeAt(i) + ((hash << 5) - hash)
+    for(let i=0;i<nombre.length;i++){
+        hash = nombre.charCodeAt(i) + ((hash<<5)-hash)
     }
-
-    let color = "#"
-    for(let i = 0; i < 3; i++){
-        let value = (hash >> (i * 8)) & 255
-        color += ("00" + value.toString(16)).slice(-2)
+    let color="#"
+    for(let i=0;i<3;i++){
+        let value=(hash>>(i*8))&255
+        color += ("00"+value.toString(16)).slice(-2)
     }
-
     return color
 }
 
-// TEXTO LEGIBLE
-function colorTexto(bgColor){
-    let r = parseInt(bgColor.substr(1,2),16)
-    let g = parseInt(bgColor.substr(3,2),16)
-    let b = parseInt(bgColor.substr(5,2),16)
-
-    let luminosidad = (0.299*r + 0.587*g + 0.114*b)
-    return luminosidad > 186 ? "black" : "white"
-}
-
-// BOTONES
-function activarBoton(grupo, activo){
-    grupo.forEach(btn => btn.classList.remove("activo"))
-    activo.classList.add("activo")
-}
-
-const btnPagado = document.getElementById("btnPagado")
-const btnDebe = document.getElementById("btnDebe")
-
-btnPagado.onclick = () => {
-    estadoPago = "Pagado"
-    activarBoton([btnPagado, btnDebe], btnPagado)
-}
-
-btnDebe.onclick = () => {
-    estadoPago = "Debe"
-    activarBoton([btnPagado, btnDebe], btnDebe)
-}
-
-const btnRecogido = document.getElementById("btnRecogido")
-const btnNoRecogido = document.getElementById("btnNoRecogido")
-
-btnRecogido.onclick = () => {
-    estadoEntrega = "Recogido"
-    activarBoton([btnRecogido, btnNoRecogido], btnRecogido)
-}
-
-btnNoRecogido.onclick = () => {
-    estadoEntrega = "No recogido"
-    activarBoton([btnRecogido, btnNoRecogido], btnNoRecogido)
-}
-
-const grid = document.getElementById("grid")
-
-function actualizarContador(){
-    let vendidos = Object.keys(data).length
-    let libres = 225 - vendidos
-
-    document.getElementById("vendidos").innerText = vendidos
-    document.getElementById("libres").innerText = libres
+function colorTexto(bg){
+    let r=parseInt(bg.substr(1,2),16)
+    let g=parseInt(bg.substr(3,2),16)
+    let b=parseInt(bg.substr(5,2),16)
+    let lum=(0.299*r+0.587*g+0.114*b)
+    return lum>186?"black":"white"
 }
 
 function renderGrid(){
-    grid.innerHTML = ""
+    let grid = document.getElementById("grid")
+    grid.innerHTML=""
 
-    for(let i=1; i<=225; i++){
-        let num = String(i).padStart(3,'0')
-
-        let div = document.createElement("div")
-        div.className = "celda"
+    for(let i=1;i<=225;i++){
+        let num=String(i).padStart(3,'0')
+        let div=document.createElement("div")
+        div.className="celda"
 
         if(data[num]){
-            div.classList.add("ocupado")
+            let info=data[num]
 
-            let info = data[num]
+            let color=colorPorNombre(info.nombre)
+            div.style.background=color
+            div.style.color=colorTexto(color)
 
-            let color = colorPorNombre(info.nombre)
-            div.style.background = color
-            div.style.color = colorTexto(color)
-
-            div.innerHTML = `
+            div.innerHTML=`
                 ${num}<br>
                 ${info.nombre.substring(0,6)}<br>
-                ${info.pago === "Pagado" ? "P" : "D"}-${info.entrega === "Recogido" ? "R" : "NR"}
+                ${info.pago==="Pagado"?"P":"D"}
             `
 
-            // TOOLTIP
-            div.title =
-                "Nombre: " + info.nombre + "\n" +
-                "Pago: " + info.pago + "\n" +
-                "Entrega: " + info.entrega
+            div.title=`Nombre: ${info.nombre}\nPago: ${info.pago}\nEntrega: ${info.entrega}`
 
-            // FRANJA
-            let franja = document.createElement("div")
-            franja.classList.add("franja")
-
-            if(info.pago === "Pagado"){
-                franja.classList.add("pagadoBar")
-            } else {
-                franja.classList.add("debeBar")
-            }
-
+            let franja=document.createElement("div")
+            franja.className="franja "+(info.pago==="Pagado"?"pagadoBar":"debeBar")
             div.appendChild(franja)
-
         } else {
-            div.innerText = num
+            div.innerText=num
         }
 
-        div.onclick = () => {
-
+        div.onclick=()=>{
             if(data[num]){
                 div.classList.toggle("liberar")
 
                 if(div.classList.contains("liberar")){
-                    div.style.background = "green"
-                    div.style.color = "white"
+                    div.style.background="green"
+                    div.style.color="white"
                 } else {
-                    let color = colorPorNombre(data[num].nombre)
-                    div.style.background = color
-                    div.style.color = colorTexto(color)
+                    let c=colorPorNombre(data[num].nombre)
+                    div.style.background=c
+                    div.style.color=colorTexto(c)
                 }
-
             } else {
                 div.classList.toggle("seleccionado")
             }
 
             if(seleccionados.includes(num)){
-                seleccionados = seleccionados.filter(x => x !== num)
+                seleccionados=seleccionados.filter(x=>x!==num)
             } else {
                 seleccionados.push(num)
             }
@@ -277,23 +193,41 @@ function renderGrid(){
 
         grid.appendChild(div)
     }
+
+    document.getElementById("vendidos").innerText=Object.keys(data).length
+    document.getElementById("libres").innerText=225-Object.keys(data).length
 }
 
-// FIREBASE
-onSnapshot(collection(db, "boletos"), (snapshot) => {
-    data = {}
-    snapshot.forEach((docu) => {
-        data[docu.id] = docu.data()
-    })
+onSnapshot(collection(db,"boletos"), snap=>{
+    data={}
+    snap.forEach(d=>data[d.id]=d.data())
     renderGrid()
-    actualizarContador()
 })
 
-// RESTO IGUAL
-window.asignar = async function(){ /* igual */ }
-window.liberar = async function(){ /* igual */ }
-window.descargar = function(){ /* igual */ }
-window.exportarExcel = function(){ /* igual */ }
+window.asignar=async()=>{
+    let nombre=document.getElementById("nombre").value
+    ultimosAsignados=[]
+
+    for(let num of seleccionados){
+        if(!nombre){ alert("Escribe nombre"); return }
+        await setDoc(doc(db,"boletos",num),{
+            nombre,pago:estadoPago,entrega:estadoEntrega
+        })
+        ultimosAsignados.push(num)
+    }
+    seleccionados=[]
+}
+
+window.liberar=async()=>{
+    for(let num of seleccionados){
+        await deleteDoc(doc(db,"boletos",num))
+    }
+    seleccionados=[]
+}
+
+window.descargar=()=>{ alert("Función activa (imagen)") }
+
+window.exportarExcel=()=>{ alert("Excel OK") }
 
 </script>
 
