@@ -158,7 +158,7 @@ const grid = document.getElementById("grid")
 
 function actualizarContador(){
     let vendidos = Object.keys(data).length
-    let libres = 150 - vendidos
+    let libres = 225 - vendidos   // ✅ CAMBIO
 
     document.getElementById("vendidos").innerText = vendidos
     document.getElementById("libres").innerText = libres
@@ -167,7 +167,7 @@ function actualizarContador(){
 function renderGrid(){
     grid.innerHTML = ""
 
-    for(let i=1; i<=150; i++){
+    for(let i=1; i<=225; i++){   // ✅ CAMBIO
         let num = String(i).padStart(3,'0')
 
         let div = document.createElement("div")
@@ -333,7 +333,7 @@ window.exportarExcel = function(){
 
     let datos = [["Numero","Nombre","Pago","Entrega"]]
 
-    for(let i=1; i<=150; i++){
+    for(let i=1; i<=225; i++){   // ✅ CAMBIO
         let num = String(i).padStart(3,'0')
 
         if(data[num]){
